@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="utf-8" />
+	<meta name="description" content="" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+	<!-- Primary Meta Tags -->
+	<title>Kanban with TailwindCSS and AlpineJS</title>
+	<meta name="title" content="Content Title" />
+	<meta name="description" content="Content Description." />
+
+	<!-- <link rel="dns-prefetch" href="//unpkg.com" />
+	<link rel="dns-prefetch" href="//cdn.jsdelivr.net" /> -->
+	<!-- <link rel="stylesheet" href="https://unpkg.com/tailwindcss@^1.0/dist/tailwind.min.css">
+	<script src="https://cdn.jsdelivr.net/gh/alpinejs/alpine@v2.x.x/dist/alpine.js" defer></script> -->
+
+	<link rel="stylesheet" href="tailwind.css">
+	<script src="alpine.js" defer></script>
+	<style>
+		[x-cloak] {
+			display: none;
+		}
+		.rounded-lg {
+			border-radius: 10px;
+		}
+
+		/* .draggable, .droppable.draggable-dropzone--occupied {
+			width: 100px; 
+			height: 100px; 
+		}
+		.droppable {
+			width: 100px; 
+			height: 100px;
+			border: solid;
+			display: flex;
+		} */
+	</style>
+</head>
+
+<body class="antialiased sans-serif bg-gray-200">
+	<div x-data="app()" x-init="[getTasks(), getRandomQuote()]" x-cloak>
+		<div class="container mx-auto px-4 py-4 md:py-10">
+
+			<!-- Alert Box -->
+			<div x-show.transition="alertBox" class="fixed mx-auto block top-0 left-0 right-0 md:w-1/4 md:mt-4 px-4 py-3 bg-gray-800 md:rounded-lg shadow-lg">
+				<div class="flex items-center">
+					<div class="flex-shrink-0 mr-3">
+						<svg class="h-6 w-6 text-gray-100"  viewBox="0 0 20 20" fill="currentColor">  <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/></svg>
+					</div>
+					<div class="text-white" x-text="alertBoxText"></div>
+				</div>
+			</div>
+			<!-- /Alert Box -->
+
+			<div class="flex flex-col md:flex-row md:justify-between md:items-center mb-4">
+				<h1 class="text-2xl text-gray-800 font-bold mb-1 md:mb-0" x-text="greetText('Mithicher.')"></h1>
+				<div x-text="new Date().toDateString()" class="text-gray-600"></div>
+			</div>
+
+			<!-- Quotes Box -->	 
+			<div class="mb-8 border-l-4 pl-4">
+				<div x-text="quoteText" class="text-xl text-gray-500 mb-1 leading-snug"></div>
+				<div class="flex items-center">
+					<div x-show="quoteAuthor.length" class="h-1 mt-1 border-t-2 border-gray-400 w-6 mr-4"></div>
+					<div x-text="quoteAuthor" class="tracking-widest uppercase text-gray-500 font-semibold text-sm"></div>
+				</div>
+			</div>
+			<!-- /Quotes Box -->	
+
+			<div class="flex -mx-4 block">
+				<template x-for="board in boards" :key="board">	
+					<div class="w-2/4 px-4">
+						<div class="bg-white rounded-lg shadow overflow-y-auto overflow-x-hidden">
+							<div class="flex justify-between items-center px-4 py-2 bg-gray-100 sticky top-0">
+								<div x-text="board" class="font-medium text-gray-800"></div>
+								<a @click.prevent="showModal(board)" href="#" class="inline-flex items-center text-blue-500 hover:text-blue-600 text-sm font-medium">
+									<svg class="h-4 w-4"  fill="none" viewBox="0 0 24 24" stroke="currentColor">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+									</svg>									  
+									Add Task
+								</a>
+							</div>
+							 
+							<div class="px-4 py-3">
+								<div :id="board">
+									<template x-for="(t, taskIndex) in tasks.filter(t => t.boardName === board)" :key="taskIndex">
+										<div>
+											<div x-show="t.edit == false">
+												<div
+													:id="t.uuid" 
+													class="bg-white rounded-lg shadow mb-4 p-2" 
+													draggable="true" 
+													@dragstart="onDragStart(event)"
+													@dblclick="t.edit = true;  $nextTick(() => focus(t.uuid))"
+												>
+													<div x-text="t.name" class="text-gray-700"></div>
+													<div x-text="new Date(t.date).toDateString()" class="text-gray-500 text-xs"></div>
+												</div>
+											</div>
+										 
+											<div x-show="t.edit == true" class="bg-white rounded-lg p-4 shadow mb-4">
+												<div class="mb-4">
+													<label class="text-gray-800 block mb-1 font-bold text-sm tracking-wide">Task Name</label>
+													<input 
+														:x-ref="t.uuid"
+														class="bg-gray-200 appearance-none border-2 border-gray-200 rounded-lg w-full py-2 px-2 text-gray-700 leading-tight focus:outline-none focus:bg-white focus:border-blue-500" 
+														type="text"
+														x-model="t.name">
+												</div>
+												<div class="text-right">
+													<button type="button" class="bg-white hover:bg-gray-100 text-gray-700 font-semibold py-1 px-2 text-sm border border-gray-300 rounded-lg shadow-sm mr-2" @click="t.edit = false">
+														Cancel
+													</button>	
+													<button type="button" class="bg-gray-800 hover:bg-gray-700 text-white font-semibold py-1 px-2 text-sm border border-gray-700 rounded-lg shadow-sm" @click="saveEditTask(t)">
+														Edit Task
+													</button>	
+												</div>
+											</div>
+											 
+										</div>
+											 
+									</template>
+								</div>
+
+								<div
+									class="hover:bg-yellow-200 rounded-lg h-24" 
+									@dragover="onDragOver(event)"
+									@drop="onDrop(event)"
+								></div>
+							</div>
+							 
+						</div>
+					</div>
+				</template>
+			</div>
+		</div>
+	
+		<!-- Modal -->
+		<div style=" background-color: rgba(0, 0, 0, 0.8)" class="fixed z-40 top-0 right-0 left-0 bottom-0 h-full w-full" x-show.transition.opacity="openModal">
+			<div class="p-4 max-w-xl mx-auto relative absolute left-0 right-0 overflow-hidden mt-24">
+				<div class="shadow absolute right-0 top-0 w-10 h-10 rounded-full bg-white text-gray-500 hover:text-gray-800 inline-flex items-center justify-center cursor-pointer"
+					x-on:click="openModal = !openModal">
+					<svg class="fill-current w-6 h-6" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+						<path
+							d="M16.192 6.344L11.949 10.586 7.707 6.344 6.293 7.758 10.535 12 6.293 16.242 7.707 17.656 11.949 13.414 16.192 17.656 17.606 16.242 13.364 12 17.606 7.758z" />
+					</svg>
+				</div>
+
+				<div class="shadow w-full rounded-lg bg-white overflow-hidden w-full block p-8">
+					<h2 class="font-bold text-2xl mb-6 text-gray-800 border-b pb-4">Task Details for <span class="text-blue-600 border-b-2 border-blue-200 leading-normal" x-text="task.boardName"></span></h2>
+				
+					<div class="mb-4">
+						<label class="text-gray-800 block mb-1 font-bold text-sm tracking-wide">Task Name</label>
+						<input class="bg-gray-200 appearance-none border-2 border-gray-200 rounded-lg w-full py-2 px-4 text-gray-700 leading-tight focus:outline-none focus:bg-white focus:border-blue-500" type="text" x-model="task.name">
+					</div>
+
+					<div class="mt-8 text-right">
+						<button type="button" class="bg-white hover:bg-gray-100 text-gray-700 font-semibold py-2 px-4 border border-gray-300 rounded-lg shadow-sm mr-2" @click="openModal = !openModal">
+							Cancel
+						</button>	
+						<button type="button" class="bg-gray-800 hover:bg-gray-700 text-white font-semibold py-2 px-4 border border-gray-700 rounded-lg shadow-sm" @click="addTask()">
+							Save Task
+						</button>	
+					</div>
+				</div>
+			</div>
+		</div>
+		<!-- /Modal -->
+	</div>
+
+	<script>
+		function app() {
+			return {
+				openModal: false,
+				alertBox: false,
+				alertBoxText: 'New task created',
+				quoteText: '',
+				quoteAuthor: '',
+			 
+				boards: [
+					'Todo',
+					'In Progress',
+					'Review',
+					'Done'
+				],
+
+				task: {
+					name: '',
+					boardName: '',
+					date: new Date()
+				},
+				editTask: {},
+
+				tasks: [],
+
+				showModal(board) {
+					this.task.boardName = board;
+					this.openModal = true;
+				},
+
+				saveEditTask(task) {
+					let taskIndex = this.tasks.findIndex(t => t.uuid === task.uuid);
+					this.tasks[taskIndex].name = task.name;
+					this.tasks[taskIndex].date = new Date();
+					this.tasks[taskIndex].edit = false;
+
+					this.alertBox = true; 
+					this.alertBoxText = 'Task detail updated';
+					this.showToastMessage();
+				},
+
+				focus(uuid) {
+                    const textInput = this.$refs[uuid];
+                    textInput.focus();
+                    textInput.select();                 
+                 },
+
+				getTasks() {
+					fetch('https://v2-api.sheety.co/8ab38e8355f6f144fb93048354178f03/tasks/tasks')
+					.then(response => response.json())
+					.then(data => {
+						this.tasks = data.tasks.map(t => {
+							return {
+								id: t.id,
+								uuid: t.uuid,
+								name: t.name,
+								status: t.status,
+								boardName: t.boardName,
+								date: t.date,
+								edit: false
+							}
+						});
+					});
+				},
+
+				addTask() {
+					const taskData = {
+						uuid: this.generateUUID(),
+						name: this.task.name,
+						status: 'pending',
+						boardName: this.task.boardName,
+						date: new Date(),
+						edit: false
+					};
+
+					// this.tasks.unshift(taskData);s
+					this.tasks.push(taskData);
+
+					// Replace this with your own Sheety API
+					fetch('https://v2-api.sheety.co/8ab38e8355f6f144fb93048354178f03/tasks/tasks', {
+						method: 'POST',
+						headers: {
+							'Content-Type': 'application/json'
+						},
+						body: JSON.stringify({
+							task: taskData
+						})
+					})
+					.then(response => response.json())
+					.then(data => {
+						this.alertBox = true; 
+						this.showToastMessage();
+
+						this.task.name = '';
+						this.task.boardName = '';
+					});
+
+					this.task.name = '';
+					this.task.boardName = '';
+
+					this.openModal = false;
+				},
+
+				onDragOver(event) {
+					event.preventDefault();
+				},
+
+				onDragStart(event) {
+					event.dataTransfer.setData('text/plain', event.target.id);
+				},
+
+				onDrop(event) {
+					console.log('Dropped', event);
+					const id = event.dataTransfer.getData('text');
+
+					const draggableElement = document.getElementById(id);
+					const dropzone = event.target;
+
+					// console.log('Dropped Text', taskText);
+
+					// update the tasks array
+					let taskIndex = this.tasks.findIndex(t => t.uuid === id);
+					this.tasks[taskIndex].boardName = event.target.id;
+					this.tasks[taskIndex].date = new Date();
+
+					// Update in the Api too
+					// Replace this with your own Sheety API
+					fetch('https://v2-api.sheety.co/8ab38e8355f6f144fb93048354178f03/tasks/tasks/'+ this.tasks[taskIndex].id, {
+						method: 'PUT',
+						headers: {
+							'Content-Type': 'application/json'
+						},
+						body: JSON.stringify({
+							task: {
+								boardName: event.target.id,
+								date: new Date()
+							}
+						})
+					})
+					.then(response => response.json())
+					.then(data => {
+						this.alertBox = true; 
+						this.alertBoxText = 'Task moved to ' + event.target.id;
+						this.showToastMessage();
+					});
+
+					dropzone.appendChild(draggableElement);
+					event.dataTransfer.clearData();
+
+					console.log('Dropped Text', this.tasks);	
+				},
+
+				generateUUID() {
+					return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+						var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+						return v.toString(16);
+					});
+				},
+
+				greetText(name) {
+					var d = new Date();
+					var time = d.getHours();
+
+					if (time < 12) {
+						return "Good morning, " + name;
+					} else if (time < 17) {
+						return "Good afternoon, " + name;
+					} else {
+						return "Good evening, " + name;
+					}
+				},
+
+				showToastMessage() {
+					return setTimeout(() => this.alertBox = false, 3000);
+				},
+
+				getRandomQuote() {
+					fetch('https://quote-garden.herokuapp.com/quotes/random')
+						.then(response => response.json())
+						.then((quoteData) => {
+							this.quoteText = quoteData.quoteText,
+							this.quoteAuthor = quoteData.quoteAuthor
+						});
+				}
+			}
+		}
+	</script>
+
+
+</body>
+
+</html>
